@@ -1,0 +1,15 @@
+numpy==1.26.4
+pandas
+APScheduler
+catboost
+holidays 
+requests
+ta
+tqdm 
+pybit
+scikit-learn
+scipy
+python-dotenv
+jupyter
+plotly 
+matplotlib
