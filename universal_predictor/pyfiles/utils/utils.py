@@ -2,6 +2,81 @@ import pandas as pd
 import numpy as np
 import random
 from datetime import datetime
+from scipy.signal import argrelextrema
+
+def balance_classes(df, target_column):
+    """
+    Balances classes in a dataframe by deleting rows to make the target classes near equal in quantity,
+    sampling the most recent data.
+
+    Parameters:
+    df (pd.DataFrame): The input dataframe containing the data to be balanced.
+    target_column (str): The name of the target column in the dataframe.
+
+    Returns:
+    pd.DataFrame: A dataframe with balanced classes.
+    """
+    # Count the number of instances of each class
+    class_counts = df[target_column].value_counts()
+    
+    # Find the minimum class count
+    min_class_count = class_counts.min()
+    
+    # Sample rows to balance the classes from the end of the dataframe
+    balanced_df = pd.concat([
+        df[df[target_column] == cls].tail(min_class_count)
+        for cls in class_counts.index
+    ])
+    
+    # Shuffle the balanced dataframe
+    balanced_df = balanced_df.sample(frac=1, random_state=42).reset_index(drop=True)
+    
+    return balanced_df
+
+
+def add_extrema_targets(df, window_size=2):
+    # Identify local minima (bottoms)
+    df['min'] = df.iloc[argrelextrema(df['CLOSE'].values, np.less_equal, order=window_size)[0]]['CLOSE']
+
+    # Identify local maxima (peaks)
+    df['max'] = df.iloc[argrelextrema(df['CLOSE'].values, np.greater_equal, order=window_size)[0]]['CLOSE']
+
+    # Initialize the TARGET column with 'hold'
+    df['TARGET'] = 'hold'
+
+    # Classify as 'buy' at local minima and 'sell' at local maxima
+    df.loc[~df['min'].isna(), 'TARGET'] = 'buy'
+    df.loc[~df['max'].isna(), 'TARGET'] = 'sell'
+    
+    # Drop the temporary columns
+    df.drop(columns=['min', 'max'], inplace=True)
+    
+    return df
+
+def create_n_features(df, n):
+        """
+        Transforms the stock data dataframe to have n hours of features for each column and the target as the n+1-th hour's stock close price.
+
+        :param df: DataFrame with a datetime index
+        :param n: Number of hours to use as features
+        :return: Transformed DataFrame with features and target
+        """
+        
+        feature_columns = [df.drop(columns=['TARGET'])]
+        
+        # Create the columns for the features
+        for i in range(1, n+1):
+            shifted_df = df.drop(columns=['DATETIME', 'TARGET']).shift(i).add_suffix(f'_t-{i}')
+            feature_columns.append(shifted_df)
+        
+        # Combine all shifted dataframes
+        feature_df = pd.concat(feature_columns, axis=1)
+        
+        feature_df['TARGET'] = df['TARGET'].tolist()
+    
+        feature_df = feature_df.dropna()
+        
+        return feature_df
 
 def set_random_seeds(seed=42):
     np.random.seed(seed)

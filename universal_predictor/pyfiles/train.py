@@ -2,7 +2,6 @@ from utils.utils import *
 import pandas as pd
 import numpy as np
 from parsing.hist_parsing import KlineDataRetriever
-from scipy.signal import argrelextrema
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.metrics import f1_score
 from catboost import CatBoostClassifier
@@ -32,24 +31,6 @@ parsing_params = {
     'start_date': datetime(2024, 3, 1),
     'end_date': datetime.now()
 }
-def add_extrema_targets(df, window_size=2):
-    # Identify local minima (bottoms)
-    df['min'] = df.iloc[argrelextrema(df['CLOSE'].values, np.less_equal, order=window_size)[0]]['CLOSE']
-
-    # Identify local maxima (peaks)
-    df['max'] = df.iloc[argrelextrema(df['CLOSE'].values, np.greater_equal, order=window_size)[0]]['CLOSE']
-
-    # Initialize the TARGET column with 'hold'
-    df['TARGET'] = 'hold'
-
-    # Classify as 'buy' at local minima and 'sell' at local maxima
-    df.loc[~df['min'].isna(), 'TARGET'] = 'buy'
-    df.loc[~df['max'].isna(), 'TARGET'] = 'sell'
-    
-    # Drop the temporary columns
-    df.drop(columns=['min', 'max'], inplace=True)
-    
-    return df
 
 def parse_and_preprocess_data(parsing_params, prediction=False) -> pd.DataFrame:
     retriever = KlineDataRetriever(category=parsing_params['category'], symbol=parsing_params['symbol'], 
@@ -69,83 +50,16 @@ def parse_and_preprocess_data(parsing_params, prediction=False) -> pd.DataFrame:
     # Apply the extrema target function
     final_data = add_extrema_targets(final_data, window_size=target_window_size)
     
-    #print(f'Final data with length of {len(final_data)} preprocesed!')
-    
     return final_data
-
-def balance_classes(df, target_column):
-    """
-    Balances classes in a dataframe by deleting rows to make the target classes near equal in quantity,
-    sampling the most recent data.
-
-    Parameters:
-    df (pd.DataFrame): The input dataframe containing the data to be balanced.
-    target_column (str): The name of the target column in the dataframe.
-
-    Returns:
-    pd.DataFrame: A dataframe with balanced classes.
-    """
-    # Count the number of instances of each class
-    class_counts = df[target_column].value_counts()
-    
-    # Find the minimum class count
-    min_class_count = class_counts.min()
-    
-    # Sample rows to balance the classes from the end of the dataframe
-    balanced_df = pd.concat([
-        df[df[target_column] == cls].tail(min_class_count)
-        for cls in class_counts.index
-    ])
-    
-    # Shuffle the balanced dataframe
-    balanced_df = balanced_df.sample(frac=1, random_state=42).reset_index(drop=True)
-    
-    return balanced_df
-
-def create_n_features(df, n):
-        """
-        Transforms the stock data dataframe to have n hours of features for each column and the target as the n+1-th hour's stock close price.
-
-        :param df: DataFrame with a datetime index
-        :param n: Number of hours to use as features
-        :return: Transformed DataFrame with features and target
-        """
-        
-        feature_columns = [df.drop(columns=['TARGET'])]
-        
-        # Create the columns for the features
-        for i in range(1, n+1):
-            shifted_df = df.drop(columns=['DATETIME', 'TARGET']).shift(i).add_suffix(f'_t-{i}')
-            feature_columns.append(shifted_df)
-        
-        # Combine all shifted dataframes
-        feature_df = pd.concat(feature_columns, axis=1)
-        
-        feature_df['TARGET'] = df['TARGET'].tolist()
-    
-        feature_df = feature_df.dropna()
-        
-        return feature_df
 
 def preprocess_for_training(final_data: pd.DataFrame):
     
     #final_data = balance_classes(final_data, 'TARGET')
     
-    cols2drop = [] #['TICKER', 'PERIOD', 'DATETIME'
-    
-    today = datetime.now().day
-    tomonth = datetime.now().month
-    toyear = datetime.now().year
-    
-    #train_data = final_data.loc[final_data['DATETIME'] < f'{toyear}-{tomonth}-{today}'].drop(columns=cols2drop, errors='ignore')
-    #test_data  = final_data.loc[final_data['DATETIME'] >= f'{toyear}-{tomonth}-{today}'].drop(columns=cols2drop, errors='ignore')
-
-    train_data = final_data.copy()#.loc[:int(len(final_data)*0.95)].reset_index(drop=True)
-    #test_data = final_data.loc[int(len(final_data)*0.95):].reset_index(drop=True)
-    
+    train_data = final_data.copy()
     train_data = create_n_features(train_data, n=n_back_features)
-    #test_data = create_n_features(test_data, n=n_back_features)
     
+    #test_data = create_n_features(test_data, n=n_back_features)
     #print(f'Train data len: {len(train_data)}, Val data len: {len(test_data)}')
     
     X, y = train_data.drop(columns=['TARGET', 'DATETIME']), train_data['TARGET']
@@ -175,8 +89,6 @@ def preprocess_for_training(final_data: pd.DataFrame):
 
     while '' in cat_features:
         cat_features.remove('')
-
-    #return X, y, test_data, cat_features
     
     return X, y, cat_features
 
@@ -208,10 +120,6 @@ def train_model(X, y, cat_features, test_data=None):
     
     print(f'Best model F1: {max(models_list, key=lambda x: x[1])[1]}')
     
-    """buy_probas = model.predict_proba(test_data.drop(columns=['TARGET', 'DATETIME']))[:, 0]
-    hold_probas = model.predict_proba(test_data.drop(columns=['TARGET', 'DATETIME']))[:, 1]
-    sell_probas = model.predict_proba(test_data.drop(columns=['TARGET', 'DATETIME']))[:, 2]"""
-    
     return model
 
 def train_and_save() -> str:
@@ -220,7 +128,6 @@ def train_and_save() -> str:
     final_data = parse_and_preprocess_data(parsing_params=parsing_params)
     print('Parsed in', time.time() - t1, 'seconds')
     
-    #X, y, test_data, cat_features = preprocess_for_training(final_data=final_data)
     X, y,  cat_features = preprocess_for_training(final_data=final_data)
     model = train_model(X=X, y=y, test_data=None, cat_features=cat_features)
     

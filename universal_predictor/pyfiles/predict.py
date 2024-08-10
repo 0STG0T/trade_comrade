@@ -1,7 +1,8 @@
 from datetime import datetime, timedelta
 import pandas as pd
 from catboost import CatBoostClassifier
-from train import parse_and_preprocess_data, create_n_features
+from train import parse_and_preprocess_data
+from utils.utils import *
 import warnings
 import zoneinfo
 
