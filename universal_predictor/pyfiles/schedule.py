@@ -15,11 +15,13 @@ def main():
     now_dt = datetime.now(zi)
     closest_dt = pipeline.get_closest_future_datetime(now_dt=now_dt, interval=interval)
     
-    scheduler = BackgroundScheduler()
+    scheduler = BackgroundScheduler(timezone=zi)
     scheduler.add_job(
         pipeline.predict_wrapper, 
         IntervalTrigger(minutes=interval, start_date=closest_dt),
-        args=[interval]
+        args=[interval],
+        id='buy_sell_hold_job',  # Optional: giving a name to the job
+        replace_existing=True    # Optional: replaces existing job with the same id
     )
     scheduler.start()
     
@@ -30,6 +32,7 @@ def main():
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
+        print("Shutting down scheduler...")
         scheduler.shutdown()
 
 if __name__ == '__main__':
