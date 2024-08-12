@@ -13,4 +13,4 @@ python-dotenv
 jupyter
 plotly 
 matplotlib
-cctx
+ccxt

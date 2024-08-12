@@ -49,9 +49,9 @@ class BuySellHoldPipeline:
         self.execute_strategy(buy_probas, sell_probas)
 
     def execute_strategy(self, buy_probas, sell_probas):
-        if buy_probas > 0.6:
+        if buy_probas > 0.65:
             self.place_order("Buy")
-        elif sell_probas > 0.6:
+        elif sell_probas > 0.65:
             self.place_order("Sell")
         else:
             print("Hold - No action taken.")

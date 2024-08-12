@@ -3,6 +3,49 @@ import numpy as np
 import random
 from datetime import datetime
 from scipy.signal import argrelextrema
+import plotly.graph_objs as go
+import pandas as pd
+
+def plot_decisions_with_markers(decisions, datetimes, closes):
+    # Create a DataFrame from the provided lists
+    df = pd.DataFrame({
+        'DateTime': pd.to_datetime(datetimes),
+        'Close': closes,
+        'Decision': decisions
+    })
+    
+    # Map decisions to colors, labels, and symbols
+    decision_colors = {0: 'green', 1: 'blue', 2: 'red'}
+    decision_labels = {0: 'Buy', 1: 'Hold', 2: 'Sell'}
+    decision_symbols = {0: 'triangle-up', 1: 'circle', 2: 'x'}
+    
+    # Create the base plot
+    fig = go.Figure()
+    
+    # Add the Close price line
+    fig.add_trace(go.Scatter(x=df['DateTime'], y=df['Close'], mode='lines', name='Close', line=dict(color='black')))
+    
+    # Add decision markers with different shapes and colors
+    for decision in decision_colors.keys():
+        decision_df = df[df['Decision'] == decision]
+        fig.add_trace(go.Scatter(
+            x=decision_df['DateTime'],
+            y=decision_df['Close'],
+            mode='markers',
+            name=decision_labels[decision],
+            marker=dict(color=decision_colors[decision], size=7, symbol=decision_symbols[decision])
+        ))
+    
+    # Update layout for better visualization
+    fig.update_layout(
+        title='Decisions on Close Price Over Time',
+        xaxis_title='DateTime',
+        yaxis_title='Close Price',
+        legend_title='Decisions',
+        template='plotly_white'
+    )
+    
+    fig.show()
 
 def balance_classes(df, target_column):
     """

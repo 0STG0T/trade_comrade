@@ -28,7 +28,7 @@ parsing_params = {
     'symbol': symbol,
     'interval': interval,
     'testnet': False,
-    'start_date': datetime(2023, 9, 1),
+    'start_date': datetime(2023, 6, 1),
     'end_date': datetime.now()
 }
 
