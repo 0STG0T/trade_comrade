@@ -88,7 +88,7 @@ class BuySellHoldPipeline:
 
     def place_order(self, side):
         try:
-            symbol = f"{self.cfg['symbol']}/USDT"
+            symbol = f"{self.cfg['symbol'][:-4]}/USDT"
             market_price = self.get_current_price(symbol)
             if market_price is None:
                 print(f"Failed to fetch market price for {symbol}, skipping order.")
