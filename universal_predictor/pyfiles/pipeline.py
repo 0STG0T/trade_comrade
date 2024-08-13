@@ -20,6 +20,28 @@ class BuySellHoldPipeline:
         
         self.thresh_1 = float(os.getenv('THRESH_1'))
         self.thresh_2 = float(os.getenv('THRESH_2'))
+        
+    def start_prediction(self):
+        print(f'Starting prediction for {self.cfg["symbol"]}!\n')
+        buy_probas, hold_probas, sell_probas = self.model.full_prediction_cycle(
+            symbol=self.cfg['symbol'],
+            interval=self.cfg['interval'],
+            n_back_features=self.cfg['n_back_features'],
+            tss_n_splits=self.cfg['tss_n_splits'],
+            tss_test_size=self.cfg['tss_test_size']
+        )
+        self.execute_strategy(buy_probas, sell_probas)
+
+    def predict(self, end_date):
+        buy_probas, hold_probas, sell_probas = self.model.full_prediction_cycle(
+            symbol=self.cfg['symbol'],
+            interval=self.cfg['interval'],
+            n_back_features=self.cfg['n_back_features'],
+            tss_n_splits=self.cfg['tss_n_splits'],
+            tss_test_size=self.cfg['tss_test_size'],
+            end_date=end_date
+        )
+        self.execute_strategy(buy_probas, sell_probas)
 
     def load_config(self):
         cfg = {
