@@ -22,6 +22,7 @@ tss_n_splits = int(os.getenv('TSS_N_SPLITS'))
 n_back_features = int(os.getenv('N_BACK_FEATURES'))
 tss_test_size = int(os.getenv('TSS_TEST_SIZE'))
 target_window_size = int(os.getenv('TARGET_WINDOW_SIZE'))
+actual_test_size = int(os.getenv('TEST_SIZE'))
 
 parsing_params = {
     'category': 'linear',
@@ -53,16 +54,15 @@ def parse_and_preprocess_data(parsing_params, prediction=False) -> pd.DataFrame:
     return final_data
 
 def preprocess_for_training(final_data: pd.DataFrame):
+
+    train_data = final_data[:-actual_test_size]
+    test_data = final_data[-actual_test_size:]
     
-    #final_data = balance_classes(final_data, 'TARGET')
-    
-    train_data = final_data.copy()
     train_data = create_n_features(train_data, n=n_back_features)
-    
-    #test_data = create_n_features(test_data, n=n_back_features)
-    #print(f'Train data len: {len(train_data)}, Val data len: {len(test_data)}')
+    test_data = create_n_features(test_data, n=n_back_features)
     
     X, y = train_data.drop(columns=['TARGET', 'DATETIME']), train_data['TARGET']
+    X_test, y_test = test_data.drop(columns=['TARGET', 'DATETIME']), test_data['TARGET']
     
     categorical_starts =[
         'TARGET',
@@ -90,11 +90,10 @@ def preprocess_for_training(final_data: pd.DataFrame):
     while '' in cat_features:
         cat_features.remove('')
     
-    return X, y, cat_features
+    return X, y, cat_features, X_test, y_test
 
-def train_model(X, y, cat_features, test_data=None):
+def train_model(X, y, cat_features, X_test, y_test):
     kf = TimeSeriesSplit(n_splits=tss_n_splits, test_size=tss_test_size)
-    
     
     models_list = []
     
@@ -104,8 +103,8 @@ def train_model(X, y, cat_features, test_data=None):
         X_train, y_train = X.iloc[train_idx], y.iloc[train_idx]
         X_val, y_val = X.iloc[val_idx], y.iloc[val_idx]
         
-        clf = CatBoostClassifier(10000, l2_leaf_reg=2.5, bootstrap_type='Bayesian', early_stopping_rounds=40, use_best_model=True,
-                                colsample_bylevel=0.85, grow_policy='Depthwise', random_state=42,
+        clf = CatBoostClassifier(10000, l2_leaf_reg=1.5, bootstrap_type='Bayesian', early_stopping_rounds=100, use_best_model=True,
+                                colsample_bylevel=0.95, random_state=42, posterior_sampling=True,
                                 leaf_estimation_method='Newton', cat_features=cat_features, auto_class_weights='Balanced')
         
         clf.fit(X_train, y_train, eval_set=(X_val, y_val), verbose=100)
@@ -118,7 +117,10 @@ def train_model(X, y, cat_features, test_data=None):
         
     model = max(models_list, key=lambda x: x[1])[0]
     
-    print(f'Best model F1: {max(models_list, key=lambda x: x[1])[1]}')
+    # Evaluating on the test data
+    score = f1_score(y_test, clf.predict(X_test).flatten(), average="weighted")
+    
+    print(f'Test data F1: {score}')
     
     return model
 
@@ -128,8 +130,8 @@ def train_and_save() -> str:
     final_data = parse_and_preprocess_data(parsing_params=parsing_params)
     print('Parsed in', time.time() - t1, 'seconds')
     
-    X, y,  cat_features = preprocess_for_training(final_data=final_data)
-    model = train_model(X=X, y=y, test_data=None, cat_features=cat_features)
+    X, y, cat_features, X_test, y_test = preprocess_for_training(final_data=final_data)
+    model = train_model(X=X, y=y, cat_features=cat_features, X_test=X_test, y_test=y_test)
     
     model.save_model('./weis/cb')
     

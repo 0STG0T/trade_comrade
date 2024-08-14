@@ -1,6 +1,5 @@
 import os
 import ccxt
-import requests
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from predict import ModelPrediction
@@ -8,19 +7,25 @@ from predict import ModelPrediction
 class BuySellHoldPipeline:
     def __init__(self) -> None:
         self.cfg = self.load_config()
-        self.model = ModelPrediction(model_path='./weis/cb')
+        self.model = ModelPrediction(model_path='./weis/cb')  # Initialize the model here
         self.bybit_client = ccxt.bybit({
             'apiKey': os.getenv('BYBIT_API_KEY'),
             'secret': os.getenv('BYBIT_API_SECRET'),
             'enableRateLimit': True,
         })
-        self.bybit_client.set_sandbox_mode(False)
-        self.iam_token = os.getenv('IAM_TOKEN')
-        self.folder_id = os.getenv('FOLDER_ID')
-        
-        self.thresh_1 = float(os.getenv('THRESH_1'))
-        self.thresh_2 = float(os.getenv('THRESH_2'))
-        
+        self.bybit_client.set_sandbox_mode(False)  # Set to True if you want to test in Bybit's testnet
+
+    def load_config(self):
+        cfg = {
+            'symbol': os.getenv('SYMBOL'),
+            'interval': int(os.getenv('INTERVAL')),
+            'tss_n_splits': int(os.getenv('TSS_N_SPLITS')),
+            'n_back_features': int(os.getenv('N_BACK_FEATURES')),
+            'tss_test_size': int(os.getenv('TSS_TEST_SIZE'))
+        }
+        return cfg
+
+
     def start_prediction(self):
         print(f'Starting prediction for {self.cfg["symbol"]}!\n')
         buy_probas, hold_probas, sell_probas = self.model.full_prediction_cycle(
@@ -43,93 +48,60 @@ class BuySellHoldPipeline:
         )
         self.execute_strategy(buy_probas, sell_probas)
 
-    def load_config(self):
-        cfg = {
-            'symbol': os.getenv('SYMBOL'),
-            'interval': int(os.getenv('INTERVAL')),
-            'tss_n_splits': int(os.getenv('TSS_N_SPLITS')),
-            'n_back_features': int(os.getenv('N_BACK_FEATURES')),
-            'tss_test_size': int(os.getenv('TSS_TEST_SIZE'))
-        }
-        return cfg
-
-    def send_metrics(self, roi, profit, fees):
-        url = f"https://monitoring.api.cloud.yandex.net/monitoring/v2/data/write?folderId={self.folder_id}&service=custom"
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {self.iam_token}"
-        }
-
-        body = {
-            "metrics": [
-                {"name": "roi", "value": roi},
-                {"name": "profit", "value": profit},
-                {"name": "fees", "value": fees}
-            ]
-        }
-
-        response = requests.post(url, json=body, headers=headers)
-        if response.status_code == 200:
-            print("Metrics sent successfully")
-        else:
-            print(f"Failed to send metrics: {response.text}")
-
     def execute_strategy(self, buy_probas, sell_probas):
-        if buy_probas > self.thresh_1:
-            profit, fees = self.place_order("Buy")
-        elif sell_probas > self.thresh_2:
-            profit, fees = self.place_order("Sell")
+        if buy_probas > 0.65:
+            self.place_order("Buy")
+        elif sell_probas > 0.65:
+            self.place_order("Sell")
         else:
             print("Hold - No action taken.")
-            return
-
-        roi = (profit - fees) / fees * 100 if fees else 0
-        self.send_metrics(roi, profit, fees)
 
     def place_order(self, side):
         try:
-            symbol = f"{self.cfg['symbol'][:-4]}/USDT"
+            # Use the correct symbol format for the spot market
+            symbol = "POPCAT/USDT"
             market_price = self.get_current_price(symbol)
             if market_price is None:
                 print(f"Failed to fetch market price for {symbol}, skipping order.")
-                return 0, 0
+                return
             
             if side == "Buy":
                 balance = self.get_usdt_balance()
-                qty = (balance * 0.95) / market_price
+                qty = (balance * 0.9) / market_price  # Use 90% of the USDT balance
             elif side == "Sell":
-                balance = self.get_asset_balance(self.cfg['symbol'])
-                qty = balance
+                balance = self.get_asset_balance("POPCAT")
+                qty = balance  # Sell all available POPCAT
 
             print(f"Balance before {side}: {balance}")
             
             if balance <= 0:
                 print(f"Insufficient balance to place {side} order for {symbol}.")
-                return 0, 0
+                return
             
+            # Set precision manually, e.g., 6 decimal places for smaller assets
             precision = 6
+
+            # Round quantity to the correct precision
             qty = round(qty, precision)
             print(f"Rounded quantity for {side}: {qty}")
 
             if qty <= 0:
                 print(f"Insufficient qty after rounding to place {side} order for {symbol}.")
-                return 0, 0
+                return
 
+            # Place the order in the spot market using CCXT
             order = self.bybit_client.create_order(symbol, 'market', side.lower(), qty)
             print(f"Order placed: {order}")
             
+            # Check if the order was filled
             if order['status'] == 'closed' and order['filled'] > 0:
                 print(f"Order successfully executed. {order['filled']} {symbol} bought/sold.")
-                profit = order['filled'] * market_price if side == "Sell" else -order['cost']
-                fees = order['fee']['cost']
-                return profit, fees
             else:
                 print("Order placed but not immediately filled. Check order details.")
-                return 0, 0
                 
         except Exception as e:
             print(f"Error placing {side} order: {e}")
-            return 0, 0
+
 
     def get_current_price(self, symbol):
         try:
