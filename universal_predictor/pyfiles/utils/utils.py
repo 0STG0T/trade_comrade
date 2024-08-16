@@ -6,6 +6,7 @@ from scipy.signal import argrelextrema
 import plotly.graph_objs as go
 import pandas as pd
 import talib
+import pywt
 
 def plot_decisions_with_markers(decisions, datetimes, closes):
     # Create a DataFrame from the provided lists
@@ -152,7 +153,7 @@ def preprocess_data(df: pd.DataFrame):
     df.columns = [x.upper() for x in df.columns]
         
     # Ensure all numeric columns are in the correct format
-    numeric_columns = ['OPEN', 'HIGH', 'LOW', 'CLOSE']
+    numeric_columns = ['OPEN', 'HIGH', 'LOW', 'CLOSE', 'VOLUME']
     df[numeric_columns] = df[numeric_columns].apply(pd.to_numeric, errors='coerce')
 
     # Remove any rows with missing or invalid data
@@ -278,7 +279,7 @@ def add_volatility_features(df):
     df['VOLATILITY_ZSCORE'] = (df['VOLATILITY'] - df['VOLATILITY'].rolling(window=30).mean()) / df['VOLATILITY'].rolling(window=30).std()
     return df
 
-def add_technical_indicators(df, use_volume=False):
+def add_technical_indicators(df, use_volume=True):
     """
     Main function to add all technical indicators and features to the DataFrame.
     """
@@ -294,6 +295,72 @@ def add_technical_indicators(df, use_volume=False):
     df = add_volatility_features(df)
     
     return df
+
+
+
+def wavelet_decomposition(df, wavelet='db1', level=1):
+    """
+    Decompose the time series using wavelet decomposition.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame containing the time series.
+    wavelet (str): The type of wavelet to use.
+    level (int): The level of decomposition.
+    
+    Returns:
+    coeffs: The wavelet coefficients.
+    """
+    coeffs = pywt.wavedec(df['CLOSE'], wavelet, level=level)
+    coeffs_df = pd.DataFrame(coeffs).T
+    coeffs_df.columns = [f'Wavelet_Coeff_Level_{i}' for i in range(len(coeffs))]
+    
+    return coeffs_df
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+def fourier_decomposition(df, n_harmonics=10):
+    """
+    Decompose the time series using Fourier decomposition.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame containing the time series.
+    n_harmonics (int): Number of Fourier harmonics to include.
+    
+    Returns:
+    fourier_series: The reconstructed series using Fourier harmonics.
+    """
+    n = len(df)
+    t = np.arange(n)
+    f = np.fft.fftfreq(n)
+    y_fft = np.fft.fft(df['CLOSE'])
+
+    fourier_series = np.zeros(n)
+    for i in range(1, n_harmonics + 1):
+        fourier_series += np.real(y_fft[i]) * np.cos(2 * np.pi * f[i] * t) - np.imag(y_fft[i]) * np.sin(2 * np.pi * f[i] * t)
+    
+    return fourier_series
+
+
+def get_all_featured_dataframes(df, use_volume=True, freq=24, decomposition_method='wavelet'):
+    dataframes_dict = {
+        'moving_averages': add_moving_averages(df),
+        'momentum_indicators': add_momentum_indicators(df),
+        'volatility_indicators': add_volatility_indicators(df),
+        'categorical_indicators': add_categorical_indicators(df),
+        'candlestick_patterns': add_candlestick_patterns(df),
+        'volatility_features': add_volatility_features(df),
+    }
+        
+    #if decomposition_method == 'wavelet':
+        #wavelet_coeffs = wavelet_decomposition(df, level=5)
+        #dataframes_dict['wavelet_decomposition'] = wavelet_coeffs
+    
+    if use_volume: 
+        dataframes_dict['volume_indicators'] = add_volume_indicators(df)
+    
+    return dataframes_dict
+
 
 def add_holidays(df):
     """

@@ -48,7 +48,7 @@ EXPOSE 8888
 COPY entrypoint.sh /usr/src/app/entrypoint.sh
 
 # Set the entrypoint script as the container's entrypoint
-#ENTRYPOINT ["sh", "/usr/src/app/entrypoint.sh"]
+ENTRYPOINT ["sh", "/usr/src/app/entrypoint.sh"]
 
 # Command to run the scheduling script
 CMD ["sh"]

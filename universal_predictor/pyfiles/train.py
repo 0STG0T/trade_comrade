@@ -44,14 +44,16 @@ def parse_and_preprocess_data(parsing_params, prediction=False) -> pd.DataFrame:
         data = retriever.fetch_data(parsing_params['start_date'], parsing_params['end_date'])
     
     preprocessed_data = preprocess_data(data)
-    data_with_indicators = add_technical_indicators(preprocessed_data)
-    data_with_holidays = add_holidays(data_with_indicators)
-    final_data = drop_nans(data_with_holidays)
     
-    # Apply the extrema target function
-    final_data = add_extrema_targets(final_data, window_size=target_window_size)
+    result_dict = {}
     
-    return final_data
+    for key, df in get_all_featured_dataframes(preprocessed_data).items():
+        final_data = drop_nans(df)
+        # Apply the extrema target function
+        final_data = add_extrema_targets(final_data, window_size=target_window_size)
+        result_dict[key] = final_data
+        
+    return result_dict
 
 def preprocess_for_training(final_data: pd.DataFrame):
 
@@ -95,6 +97,7 @@ def preprocess_for_training(final_data: pd.DataFrame):
         'CDL_KICKING'
     ]
 
+
     cat_features = []
 
     for cs in categorical_starts:
@@ -120,7 +123,7 @@ def train_model(X, y, cat_features, X_test, y_test):
                                 colsample_bylevel=0.95, random_state=42, posterior_sampling=True,
                                 leaf_estimation_method='Newton', cat_features=cat_features, auto_class_weights='Balanced')
         
-        clf.fit(X_train, y_train, eval_set=(X_val, y_val), verbose=100)
+        clf.fit(X_train, y_train, eval_set=(X_val, y_val), verbose=1000)
         
         score = f1_score(y_val, clf.predict(X_val).flatten(), average="weighted")
         
@@ -140,17 +143,21 @@ def train_model(X, y, cat_features, X_test, y_test):
 def train_and_save() -> str:
     print('Starting parsing!')
     t1 = time.time()
-    final_data = parse_and_preprocess_data(parsing_params=parsing_params)
+    result_dict = parse_and_preprocess_data(parsing_params=parsing_params)
     print('Parsed in', time.time() - t1, 'seconds')
     
-    X, y, cat_features, X_test, y_test = preprocess_for_training(final_data=final_data)
-    model = train_model(X=X, y=y, cat_features=cat_features, X_test=X_test, y_test=y_test)
+    print('Training the models!')
+    for key, final_data in result_dict.items():
+        print(f'Leraning {key}')
     
-    model.save_model('./weis/cb')
+        X, y, cat_features, X_test, y_test = preprocess_for_training(final_data=final_data)
+        model = train_model(X=X, y=y, cat_features=cat_features, X_test=X_test, y_test=y_test)
+        
+        # Saving the model
+        model.save_model(f'./weis/{key}_model')
+        print('Model saved!')
     
-    print('Model saved!')
-    
-    return model
+    print('Training complete!')
 
 if __name__ == '__main__':
     train_and_save()
