@@ -64,7 +64,8 @@ def preprocess_for_training(final_data: pd.DataFrame):
     X, y = train_data.drop(columns=['TARGET', 'DATETIME']), train_data['TARGET']
     X_test, y_test = test_data.drop(columns=['TARGET', 'DATETIME']), test_data['TARGET']
     
-    categorical_starts = [
+    categorical_starts =[
+        'TARGET',
         'BULLISH',
         'BEARISH',
         'OVERBOUGHT_RSI',
@@ -75,24 +76,10 @@ def preprocess_for_training(final_data: pd.DataFrame):
         'BB_BANDWIDTH_LOW',
         'STOCH_OVERBOUGHT',
         'STOCH_OVERSOLD',
+        'TSI_BULLISH',
+        'TSI_BEARISH',
         'UO_OVERBOUGHT',
-        'UO_OVERSOLD',
-        'CDL_DOJI',
-        'CDL_ENGULFING',
-        'CDL_HAMMER',
-        'CDL_SHOOTINGSTAR',
-        'CDL_MORNINGSTAR',
-        'CDL_EVENINGSTAR',
-        'CDL_HARAMI',
-        'CDL_PIERCING',
-        'CDL_DARKCLOUDCOVER',
-        'CDL_THREE_WHITE_SOLDIERS',
-        'CDL_THREE_BLACK_CROWS',
-        'CDL_HANGINGMAN',
-        'CDL_INVERTEDHAMMER',
-        'CDL_BELTHOLD',
-        'CDL_HARAMICROSS',
-        'CDL_KICKING'
+        'UO_OVERSOLD'
     ]
 
     cat_features = []

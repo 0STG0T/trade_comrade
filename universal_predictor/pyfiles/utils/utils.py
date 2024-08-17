@@ -5,7 +5,6 @@ from datetime import datetime
 from scipy.signal import argrelextrema
 import plotly.graph_objs as go
 import pandas as pd
-import talib
 
 def plot_decisions_with_markers(decisions, datetimes, closes):
     # Create a DataFrame from the provided lists
@@ -168,132 +167,121 @@ def preprocess_data(df: pd.DataFrame):
 
     return df
 
-import talib
-import numpy as np
+def add_technical_indicators(df, use_volume=False):
+    """
+    Add technical indicators to the data.
+    
+    Parameters:
+    df (pd.DataFrame): Preprocessed data.
+    use_volume (bool): Whether to include volume-based indicators.
+    
+    Returns:
+    pd.DataFrame: Data with technical indicators.
+    """
+    import ta
+    
+    # Add moving averages
+    df['MA_5'] = ta.trend.sma_indicator(df['CLOSE'], window=5)
+    df['MA_10'] = ta.trend.sma_indicator(df['CLOSE'], window=10)
+    df['MA_20'] = ta.trend.sma_indicator(df['CLOSE'], window=20)
+    df['EMA_5'] = ta.trend.ema_indicator(df['CLOSE'], window=5)
+    df['EMA_10'] = ta.trend.ema_indicator(df['CLOSE'], window=10)
+    df['EMA_20'] = ta.trend.ema_indicator(df['CLOSE'], window=20)
+    
+    # Add Relative Strength Index (RSI)
+    df['RSI'] = ta.momentum.rsi(df['CLOSE'])
+    
+    # Add Moving Average Convergence Divergence (MACD)
+    df['MACD'] = ta.trend.macd(df['CLOSE'])
+    df['MACD_SIGNAL'] = ta.trend.macd_signal(df['CLOSE'])
+    df['MACD_DIFF'] = ta.trend.macd_diff(df['CLOSE'])
+    
+    # Add Bollinger Bands
+    bb = ta.volatility.BollingerBands(df['CLOSE'])
+    df['BB_HIGH'] = bb.bollinger_hband()
+    df['BB_LOW'] = bb.bollinger_lband()
+    df['BB_MAVG'] = bb.bollinger_mavg()
+    df['BB_WIDTH'] = bb.bollinger_wband()
+    
+    # Add Stochastic Oscillator
+    df['STOCH_K'] = ta.momentum.stoch(df['HIGH'], df['LOW'], df['CLOSE'])
+    df['STOCH_D'] = ta.momentum.stoch_signal(df['HIGH'], df['LOW'], df['CLOSE'])
+    
+    # Add Average True Range (ATR)
+    df['ATR'] = ta.volatility.average_true_range(df['HIGH'], df['LOW'], df['CLOSE'])
+    
+    # Add Commodity Channel Index (CCI)
+    df['CCI'] = ta.trend.cci(df['HIGH'], df['LOW'], df['CLOSE'])
+    
+    # Add True Strength Index (TSI)
+    df['TSI'] = ta.momentum.tsi(df['CLOSE'])
+    
+    # Add Ultimate Oscillator
+    df['UO'] = ta.momentum.ultimate_oscillator(df['HIGH'], df['LOW'], df['CLOSE'])
+    
+    # Add Williams %R
+    df['WILLIAMS_R'] = ta.momentum.williams_r(df['HIGH'], df['LOW'], df['CLOSE'])
+    
+    # Add Keltner Channel
+    kc = ta.volatility.KeltnerChannel(df['HIGH'], df['LOW'], df['CLOSE'])
+    df['KC_HIGH'] = kc.keltner_channel_hband()
+    df['KC_LOW'] = kc.keltner_channel_lband()
+    #df['KC_MAVG'] = kc.keltner_channel_mavg()
+    
+    # Add Donchian Channel
+    dc = ta.volatility.DonchianChannel(df['HIGH'], df['LOW'], df['CLOSE'])
+    df['DC_HIGH'] = dc.donchian_channel_hband()
+    df['DC_LOW'] = dc.donchian_channel_lband()
+    df['DC_MAVG'] = dc.donchian_channel_mband()
+    
+    # Add Percentage Price Oscillator (PPO)
+    df['PPO'] = ta.momentum.ppo(df['CLOSE'])
+    
+    if use_volume:
+        # Add On-Balance Volume (OBV)
+        df['OBV'] = ta.volume.on_balance_volume(df['CLOSE'], df['VOLUME'])
+        
+        # Add Accumulation/Distribution Index (ADI)
+        df['ADI'] = ta.volume.acc_dist_index(df['HIGH'], df['LOW'], df['CLOSE'], df['VOLUME'])
 
-def add_moving_averages(df):
-    """
-    Add moving averages to the DataFrame.
-    """
-    df['MA_3'] = talib.SMA(df['CLOSE'], timeperiod=3)
-    df['MA_5'] = talib.SMA(df['CLOSE'], timeperiod=5)
-    df['EMA_3'] = talib.EMA(df['CLOSE'], timeperiod=3)
-    df['EMA_5'] = talib.EMA(df['CLOSE'], timeperiod=5)
-    return df
-
-def add_momentum_indicators(df):
-    """
-    Add momentum indicators to the DataFrame.
-    """
-    df['RSI'] = talib.RSI(df['CLOSE'], timeperiod=7)
-    df['MACD'], df['MACD_SIGNAL'], df['MACD_DIFF'] = talib.MACD(df['CLOSE'], fastperiod=6, slowperiod=13, signalperiod=5)
-    df['STOCH_K'], df['STOCH_D'] = talib.STOCH(df['HIGH'], df['LOW'], df['CLOSE'], 
-                                                fastk_period=7, slowk_period=3, slowk_matype=0, 
-                                                slowd_period=3, slowd_matype=0)
-    df['CCI'] = talib.CCI(df['HIGH'], df['LOW'], df['CLOSE'], timeperiod=7)
-    df['UO'] = talib.ULTOSC(df['HIGH'], df['LOW'], df['CLOSE'], timeperiod1=3, timeperiod2=7, timeperiod3=14)
-    df['WILLIAMS_R'] = talib.WILLR(df['HIGH'], df['LOW'], df['CLOSE'], timeperiod=7)
-    return df
-
-def add_volatility_indicators(df):
-    """
-    Add volatility indicators to the DataFrame.
-    """
-    df['BB_HIGH'], df['BB_MAVG'], df['BB_LOW'] = talib.BBANDS(df['CLOSE'], timeperiod=10, nbdevup=3, nbdevdn=3, matype=0)
-    df['ATR'] = talib.ATR(df['HIGH'], df['LOW'], df['CLOSE'], timeperiod=7)
-    df['KC_HIGH'] = talib.SMA(df['CLOSE'], timeperiod=10) + 1.5 * df['ATR']
-    df['KC_LOW'] = talib.SMA(df['CLOSE'], timeperiod=10) - 1.5 * df['ATR']
-    df['DC_HIGH'] = df['HIGH'].rolling(window=10).max()
-    df['DC_LOW'] = df['LOW'].rolling(window=10).min()
-    df['DC_MAVG'] = (df['DC_HIGH'] + df['DC_LOW']) / 2
-    df['PPO'] = talib.PPO(df['CLOSE'], fastperiod=6, slowperiod=13, matype=0)
-    return df
-
-def add_volume_indicators(df):
-    """
-    Add volume-based indicators to the DataFrame if volume is present.
-    """
-    df['OBV'] = talib.OBV(df['CLOSE'], df['VOLUME'])
-    df['ADI'] = talib.AD(df['HIGH'], df['LOW'], df['CLOSE'], df['VOLUME'])
-    df['CMF'] = talib.ADOSC(df['HIGH'], df['LOW'], df['CLOSE'], df['VOLUME'], fastperiod=3, slowperiod=10)
-    df['FORCE_INDEX'] = df['CLOSE'].diff(1) * df['VOLUME']
-    df['MFI'] = talib.MFI(df['HIGH'], df['LOW'], df['CLOSE'], df['VOLUME'], timeperiod=7)
-    df['EOM'] = (df['HIGH'] - df['LOW']) / df['VOLUME']
-    df['VPT'] = (df['CLOSE'].pct_change() * df['VOLUME']).cumsum()
-    df['NVI'] = df['VOLUME'].pct_change().apply(lambda x: 0 if x > 0 else 1).cumsum()
-    return df
-
-def add_categorical_indicators(df):
-    """
-    Add categorical indicators to the DataFrame.
-    """
-    df['BULLISH'] = df['CLOSE'] > df['MA_5']
-    df['BEARISH'] = df['CLOSE'] < df['MA_5']
+        # Add Chaikin Money Flow (CMF)
+        df['CMF'] = ta.volume.chaikin_money_flow(df['HIGH'], df['LOW'], df['CLOSE'], df['VOLUME'])
+        
+        # Add Force Index
+        df['FORCE_INDEX'] = ta.volume.force_index(df['CLOSE'], df['VOLUME'])
+        
+        # Add Money Flow Index (MFI)
+        df['MFI'] = ta.volume.money_flow_index(df['HIGH'], df['LOW'], df['CLOSE'], df['VOLUME'])
+        
+        # Add Ease of Movement (EOM)
+        df['EOM'] = ta.volume.ease_of_movement(df['HIGH'], df['LOW'], df['CLOSE'], df['VOLUME'])
+        
+        # Add Volume Price Trend (VPT)
+        df['VPT'] = ta.volume.volume_price_trend(df['CLOSE'], df['VOLUME'])
+        
+        # Add Negative Volume Index (NVI)
+        df['NVI'] = ta.volume.negative_volume_index(df['CLOSE'], df['VOLUME'])
+    else:
+        df = df.drop(columns=['VOLUME'])
+    
+    # Add categorical indicators
+    df['BULLISH'] = df['CLOSE'] > df['MA_20']
+    df['BEARISH'] = df['CLOSE'] < df['MA_20']
     df['OVERBOUGHT_RSI'] = df['RSI'] > 70
     df['OVERSOLD_RSI'] = df['RSI'] < 30
     df['MACD_BULLISH'] = df['MACD'] > df['MACD_SIGNAL']
     df['MACD_BEARISH'] = df['MACD'] < df['MACD_SIGNAL']
-    df['BB_BANDWIDTH_HIGH'] = (df['BB_HIGH'] - df['BB_LOW']) > (df['BB_HIGH'] - df['BB_LOW']).rolling(window=10).mean()
-    df['BB_BANDWIDTH_LOW'] = (df['BB_HIGH'] - df['BB_LOW']) < (df['BB_HIGH'] - df['BB_LOW']).rolling(window=10).mean()
+    df['BB_BANDWIDTH_HIGH'] = df['BB_WIDTH'] > df['BB_WIDTH'].rolling(window=20).mean()
+    df['BB_BANDWIDTH_LOW'] = df['BB_WIDTH'] < df['BB_WIDTH'].rolling(window=20).mean()
     df['STOCH_OVERBOUGHT'] = df['STOCH_K'] > 80
     df['STOCH_OVERSOLD'] = df['STOCH_K'] < 20
+    df['TSI_BULLISH'] = df['TSI'] > 0
+    df['TSI_BEARISH'] = df['TSI'] < 0
     df['UO_OVERBOUGHT'] = df['UO'] > 70
     df['UO_OVERSOLD'] = df['UO'] < 30
-    return df
-
-def add_candlestick_patterns(df):
-    """
-    Add candlestick pattern recognition features to the DataFrame as categorical variables.
-    """
-    patterns = {
-        'CDL_DOJI': talib.CDLDOJI,
-        'CDL_ENGULFING': talib.CDLENGULFING,
-        'CDL_HAMMER': talib.CDLHAMMER,
-        'CDL_SHOOTINGSTAR': talib.CDLSHOOTINGSTAR,
-        'CDL_MORNINGSTAR': lambda o, h, l, c: talib.CDLMORNINGSTAR(o, h, l, c, penetration=0.3),
-        'CDL_EVENINGSTAR': lambda o, h, l, c: talib.CDLEVENINGSTAR(o, h, l, c, penetration=0.3),
-        'CDL_HARAMI': talib.CDLHARAMI,
-        'CDL_PIERCING': talib.CDLPIERCING,
-        'CDL_DARKCLOUDCOVER': lambda o, h, l, c: talib.CDLDARKCLOUDCOVER(o, h, l, c, penetration=0.3),
-        'CDL_THREE_WHITE_SOLDIERS': talib.CDL3WHITESOLDIERS,
-        'CDL_THREE_BLACK_CROWS': talib.CDL3BLACKCROWS,
-        'CDL_HANGINGMAN': talib.CDLHANGINGMAN,
-        'CDL_INVERTEDHAMMER': talib.CDLINVERTEDHAMMER,
-        'CDL_BELTHOLD': talib.CDLBELTHOLD,
-        'CDL_HARAMICROSS': talib.CDLHARAMICROSS,
-        'CDL_KICKING': talib.CDLKICKING
-    }
-    
-    for pattern_name, pattern_function in patterns.items():
-        df[pattern_name] = pattern_function(df['OPEN'], df['HIGH'], df['LOW'], df['CLOSE'])
-        df[pattern_name] = df[pattern_name].apply(lambda x: int(x)).astype('category')
     
     return df
 
-def add_volatility_features(df):
-    """
-    Add volatility-based features to the DataFrame.
-    """
-    df['VOLATILITY'] = df['CLOSE'].rolling(window=7).std()
-    df['VOLATILITY_ZSCORE'] = (df['VOLATILITY'] - df['VOLATILITY'].rolling(window=30).mean()) / df['VOLATILITY'].rolling(window=30).std()
-    return df
-
-def add_technical_indicators(df, use_volume=False):
-    """
-    Main function to add all technical indicators and features to the DataFrame.
-    """
-    df = add_moving_averages(df)
-    df = add_momentum_indicators(df)
-    df = add_volatility_indicators(df)
-    
-    if use_volume:
-        df = add_volume_indicators(df)
-    
-    df = add_categorical_indicators(df)
-    df = add_candlestick_patterns(df)
-    df = add_volatility_features(df)
-    
-    return df
 
 def add_holidays(df):
     """

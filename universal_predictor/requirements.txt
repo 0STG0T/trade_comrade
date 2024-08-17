@@ -14,4 +14,3 @@ jupyter
 plotly 
 matplotlib
 ccxt
-TA-Lib-Precompiled
