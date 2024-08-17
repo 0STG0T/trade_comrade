@@ -53,6 +53,7 @@ def parse_and_preprocess_data(parsing_params, prediction=False) -> pd.DataFrame:
         final_data = add_extrema_targets(final_data, window_size=target_window_size)
         result_dict[key] = final_data
         
+        
     return result_dict
 
 def preprocess_for_training(final_data: pd.DataFrame):

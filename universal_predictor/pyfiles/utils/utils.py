@@ -283,15 +283,15 @@ def add_technical_indicators(df, use_volume=True):
     """
     Main function to add all technical indicators and features to the DataFrame.
     """
-    df = add_moving_averages(df)
-    df = add_momentum_indicators(df)
-    df = add_volatility_indicators(df)
+    #df = add_moving_averages(df)
+    #df = add_momentum_indicators(df)
+    #df = add_volatility_indicators(df)
     
-    if use_volume:
-        df = add_volume_indicators(df)
+    #if use_volume:
+        #df = add_volume_indicators(df)
     
-    df = add_categorical_indicators(df)
-    df = add_candlestick_patterns(df)
+    #df = add_categorical_indicators(df)
+    #df = add_candlestick_patterns(df)
     df = add_volatility_features(df)
     
     return df
@@ -343,13 +343,14 @@ def fourier_decomposition(df, n_harmonics=10):
 
 
 def get_all_featured_dataframes(df, use_volume=True, freq=24, decomposition_method='wavelet'):
+    
     dataframes_dict = {
-        'moving_averages': add_moving_averages(df),
-        'momentum_indicators': add_momentum_indicators(df),
-        'volatility_indicators': add_volatility_indicators(df),
-        'categorical_indicators': add_categorical_indicators(df),
-        'candlestick_patterns': add_candlestick_patterns(df),
-        'volatility_features': add_volatility_features(df),
+        'moving_averages': add_moving_averages(df.copy()),
+        'momentum_indicators': add_momentum_indicators(df.copy()),
+        'volatility_indicators': add_volatility_indicators(df.copy()),
+        #'categorical_indicators': add_categorical_indicators(df.copy()),
+        'candlestick_patterns': add_candlestick_patterns(df.copy()),
+        'volatility_features': add_volatility_features(df.copy()),
     }
         
     #if decomposition_method == 'wavelet':
@@ -357,7 +358,7 @@ def get_all_featured_dataframes(df, use_volume=True, freq=24, decomposition_meth
         #dataframes_dict['wavelet_decomposition'] = wavelet_coeffs
     
     if use_volume: 
-        dataframes_dict['volume_indicators'] = add_volume_indicators(df)
+        dataframes_dict['volume_indicators'] = add_volume_indicators(df.copy())
     
     return dataframes_dict
 
