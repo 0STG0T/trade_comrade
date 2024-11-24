@@ -1,7 +1,2 @@
-popcat tg channel 15M: -1002154749951 1M: -1002209604334
-sol tg channel -1002149533300
-not tg channel -1002236964016
-
-
 build lines: docker build --build-arg CACHEBUST=$(date +%s) -t 0stg0t/popcat_predictor:latest .
 jupyter notebook --ip=0.0.0.0 --port=8888 --no-browser --allow-root --NotebookApp.token='' --NotebookApp.password=''
